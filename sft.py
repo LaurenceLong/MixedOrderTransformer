@@ -1,19 +1,21 @@
-import torch
+import os
+
 from transformers import AutoModelForCausalLM, Trainer, TrainingArguments, AutoTokenizer
 
+from config import model_name
+from data.math_dataset import create_sft_dataset
 from mixed_tokenizer import MixedTokenizer  # 引入你设计的tokenizer
 
 model = AutoModelForCausalLM.from_pretrained("./pythia_pretrain")
 
-model_name = "EleutherAI/pythia-70m"  # 选择 Pythia 预训练模型
 origin_tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer = MixedTokenizer(origin_tokenizer)
 
-
-
+data_dir = os.path.join(os.getcwd(), "data")
+sft_dataset_file = os.path.join(data_dir, "data_math_sft.txt")
 
 # 生成微调数据
-sft_dataset = create_sft_dataset(size=5000, reverse_ratio=0.25)
+sft_dataset = create_sft_dataset(sft_dataset_file, tokenizer, 5000)
 
 # 更新训练参数
 sft_training_args = TrainingArguments(

@@ -1,14 +1,16 @@
 import json
-import os
+
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from mixed_tokenizer import MixedTokenizer
+
+from config import model_name
+from mixed_tokenizer import load_tokenizer
 
 # 加载训练后的模型和 tokenizer
-# output_dir = "EleutherAI/pythia-70m"  # 在训练时的 output_dir 中保存的模型
-output_dir = "./pythia_pretrain/checkpoint-3750"  # 在训练时的 output_dir 中保存的模型
+# output_dir = model_name  # 在训练时的 output_dir 中保存的模型
+output_dir = "./pythia_pretrain/checkpoint-2325"  # 在训练时的 output_dir 中保存的模型
 model = AutoModelForCausalLM.from_pretrained(output_dir)
-tokenizer = MixedTokenizer(AutoTokenizer.from_pretrained(output_dir))
+tokenizer = load_tokenizer(output_dir)
 
 
 def generate_text(input_text):
@@ -31,7 +33,7 @@ def generate_text(input_text):
     print("result_text:", decoded_outputs)
 
 
-with open("D:\work\MixedOrderTransformer\data\data_math.txt.jsonl") as fd:
+with open("/home/laurence/work/MixedOrderTransformer/data/data_math.txt.jsonl") as fd:
     data = [json.loads(line) for line in fd.readlines()]
 
     for i in range(10):

@@ -1,6 +1,8 @@
 import json
 import os
+from typing import Dict
 
+import torch
 from datasets import Dataset
 
 from data.gen_math4 import generate_training_text
@@ -14,20 +16,33 @@ def pad_sequence(sequence, max_length, pad_token_id):
     return sequence + [pad_token_id] * (max_length - len(sequence))
 
 
-def create_math_dataset(file_path, tokenizer, size=10 ** 5, reverse_ratio=0.25, mean=4, std=1.0, min_len=2):
+def create_math_dataset(
+        file_path: str,
+        tokenizer,
+        size: int = 10 ** 5,
+        reverse_ratio: float = 0.25,
+        mean: float = 4,
+        std: float = 1.0,
+        min_len: int = 2,
+        block_size: int = 512  # 每个训练样本的最大长度
+) -> Dataset:
     """
-    生成正序和逆序混合的数学任务数据集，并保存到本地文件。
-    如果文件已存在，则直接从文件加载数据。
+    生成正序和逆序混合的数学任务数据集，使用连续文本流方式。
 
-    :param file_path: 数据集的存储路径
-    :param tokenizer: 分词器（使用 MixedTokenizer）
-    :param size: 数据集大小
-    :param reverse_ratio: 逆序比例
-    :param mean: 逆序长度均值
-    :param std: 逆序长度标准差
-    :param min_len: 逆序最小长度
-    :return: Dataset 对象
+    Args:
+        file_path: 数据集的存储路径
+        tokenizer: 分词器
+        size: 数据集大小
+        reverse_ratio: 逆序比例
+        mean: 逆序长度均值
+        std: 逆序长度标准差
+        min_len: 逆序最小长度
+        block_size: 每个训练样本的长度
+
+    Returns:
+        Dataset: HuggingFace dataset对象
     """
+    # 加载或生成原始文本数据
     if os.path.exists(file_path):
         print(f"加载已有数据集文件：{file_path}")
         with open(file_path, "r", encoding="utf-8") as f:
@@ -36,56 +51,86 @@ def create_math_dataset(file_path, tokenizer, size=10 ** 5, reverse_ratio=0.25, 
         print(f"生成新的数据集并保存到：{file_path}")
         sft, data = generate_training_text(file_path, size)
 
-    # 将数据编码成 Dataset 格式
-    max_length = 0
-    dataset = []
+    # 将所有文本编码并连接成一个长序列
+    all_tokens = []
     for text in data:
         encoded = tokenizer.mixed_order_encode(
-            text, reverse_ratio=reverse_ratio, add_special_tokens=True, mean=mean, std=std, min_len=min_len
+            text, reverse_ratio=reverse_ratio, mean=mean, std=std, min_len=min_len
         )
-        max_length = max(max_length, len(encoded))
-        dataset.append(encoded)
+        all_tokens.extend(encoded)
+        # 可以在每个样本之间添加特殊分隔符
+        all_tokens.append(tokenizer.eos_token_id)  # 如果需要的话
 
-    # 对所有样本进行 padding
-    pad_token_id = 0 if tokenizer.pad_token_id is None else tokenizer.pad_token_id
-    padded_dataset = [
-        {
-            "input_ids": pad_sequence(encoded, max_length, pad_token_id),
-            "labels": pad_sequence(encoded, max_length, pad_token_id)
-        }
-        for encoded in dataset
-    ]
+    # 将长序列切分成固定大小的块
+    result_dataset = []
+    for i in range(0, len(all_tokens) - block_size + 1, block_size):
+        chunk = all_tokens[i:i + block_size]
+        if len(chunk) == block_size:  # 只使用完整的块
+            input_ids = torch.tensor(chunk, dtype=torch.long)
+            result_dataset.append({
+                "input_ids": input_ids,
+                "attention_mask": torch.ones_like(input_ids),
+                "labels": input_ids.clone()
+            })
 
-    return Dataset.from_list(padded_dataset)
+    return Dataset.from_list(result_dataset)
 
 
 # 数据集：构造更复杂的数学任务数据
-def create_sft_dataset(file_path, tokenizer: MixedTokenizer, size):
+def create_sft_dataset(
+        file_path,
+        tokenizer: MixedTokenizer,
+        size,
+        block_size: int = 512  # 每个训练样本的最大长度
+):
+    """
+    创建SFT数据集，使用连续文本流方式。
+
+    Args:
+        file_path: 数据集文件路径
+        tokenizer: 分词器
+        size: 数据集大小
+        block_size: 每个训练样本的长度
+
+    Returns:
+        Dataset: HuggingFace dataset对象
+    """
+    # 加载或生成数据
     if os.path.exists(f"{file_path}.jsonl"):
         print(f"加载已有数据集文件：{file_path}.jsonl")
         with open(f"{file_path}.jsonl", "r", encoding="utf-8") as f:
-            sft = [json.loads(line.strip()) for line in f.readlines()]
+            sft = [line.strip() for line in f.readlines()]
     else:
         print(f"生成新的数据集并保存到：{file_path}")
         sft, data = generate_training_text(file_path, size)
 
-    max_length = 0
-    dataset = []
-    for jsonl in sft:
-        encoded = tokenizer.encode(jsonl["prompt"]) + tokenizer.reverse_order_encode(jsonl["answer"])
-        max_length = max(max_length, len(encoded))
-        dataset.append(encoded)
-    # 对所有样本进行 padding
-    pad_token_id = 0 if tokenizer.pad_token_id is None else tokenizer.pad_token_id
-    padded_dataset = [
-        {
-            "input_ids": pad_sequence(encoded, max_length, pad_token_id),
-            "labels": pad_sequence(encoded, max_length, pad_token_id)
-        }
-        for encoded in dataset
-    ]
+    # 将所有样本连接成一个长序列
+    all_tokens = []
+    for jsonl_str in sft:
+        # 编码提示和回答
+        jsonl = json.loads(jsonl_str)
+        prompt_tokens = tokenizer.encode(jsonl["prompt"])
+        answer_tokens = tokenizer.reverse_order_encode(jsonl["answer"])
 
-    return Dataset.from_list(padded_dataset)
+        # 添加到总序列中
+        all_tokens.extend(prompt_tokens)
+        all_tokens.extend(answer_tokens)
+
+        all_tokens.append(tokenizer.eos_token_id)
+
+    # 将长序列切分成固定大小的块
+    result_dataset = []
+    for i in range(0, len(all_tokens) - block_size + 1, block_size):
+        chunk = all_tokens[i:i + block_size]
+        if len(chunk) == block_size:  # 只使用完整的块
+            input_ids = torch.tensor(chunk, dtype=torch.long)
+            result_dataset.append({
+                "input_ids": input_ids,
+                "attention_mask": torch.ones_like(input_ids),
+                "labels": input_ids.clone()
+            })
+
+    return Dataset.from_list(result_dataset)
 
 
 if __name__ == "__main__":

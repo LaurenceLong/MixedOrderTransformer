@@ -16,7 +16,7 @@ def generate_arithmetic_problem():
         num2 = random.randint(1, max_num)  # 限制除数范围，避免结果过于复杂
         num1 = num2 * random.randint(1, max_num)  # 确保能整除
 
-    question = f"{num1} {operation} {num2} = ?"
+    question = f"{num1} {operation} {num2} = "
 
     if operation == '+':
         answer = num1 + num2
@@ -27,7 +27,7 @@ def generate_arithmetic_problem():
     else:
         answer = num1 / num2  # 整数除法
 
-    text = f"{num1} {operation} {num2} = {answer}"
+    text = f"{question}{answer}"
     return {"prompt": question, "answer": str(answer)}, text
 
 
