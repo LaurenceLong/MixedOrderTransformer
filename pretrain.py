@@ -7,7 +7,7 @@ from transformers import (
     AutoTokenizer
 )
 
-from config import model_name
+from config import model_name, output_dir
 from data.math_dataset import create_math_dataset, create_sft_dataset
 from mixed_tokenizer import MixedTokenizer
 
@@ -56,7 +56,7 @@ eval_dataset = create_sft_dataset(
 
 # 设置训练参数
 training_args = TrainingArguments(
-    output_dir="./pythia_pretrain",
+    output_dir=output_dir,
     evaluation_strategy="epoch",
     save_strategy="epoch",
     learning_rate=5e-5,

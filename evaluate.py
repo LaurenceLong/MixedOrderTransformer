@@ -9,7 +9,7 @@ from data.math_dataset import create_sft_dataset
 from mixed_tokenizer import MixedTokenizer
 
 # 加载训练后的模型和 tokenizer
-output_dir = "./pythia_pretrain/checkpoint-3750"  # 在训练时的 output_dir 中保存的模型
+output_dir = "pythia_pretrain_70m/checkpoint-3750"  # 在训练时的 output_dir 中保存的模型
 model = AutoModelForCausalLM.from_pretrained(output_dir)
 tokenizer = MixedTokenizer(AutoTokenizer.from_pretrained(output_dir))
 

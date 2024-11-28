@@ -2,11 +2,11 @@ import os
 
 from transformers import AutoModelForCausalLM, Trainer, TrainingArguments, AutoTokenizer
 
-from config import model_name
+from config import model_name, output_dir
 from data.math_dataset import create_sft_dataset
 from mixed_tokenizer import MixedTokenizer  # 引入你设计的tokenizer
 
-model = AutoModelForCausalLM.from_pretrained("./pythia_pretrain")
+model = AutoModelForCausalLM.from_pretrained(output_dir)
 
 origin_tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer = MixedTokenizer(origin_tokenizer)

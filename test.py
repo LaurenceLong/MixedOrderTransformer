@@ -8,7 +8,7 @@ from mixed_tokenizer import load_tokenizer
 
 # 加载训练后的模型和 tokenizer
 # output_dir = model_name  # 在训练时的 output_dir 中保存的模型
-output_dir = "./pythia_pretrain/checkpoint-2325"  # 在训练时的 output_dir 中保存的模型
+output_dir = "pythia_pretrain_70m/checkpoint-2325"  # 在训练时的 output_dir 中保存的模型
 model = AutoModelForCausalLM.from_pretrained(output_dir)
 tokenizer = load_tokenizer(output_dir)
 
